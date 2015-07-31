@@ -1,0 +1,269 @@
+<html>
+<head>
+<title>Admin Console</title>
+</head>
+<body>
+<h1>Welcome Admin</h1>
+<p>Configuration Options</p>
+<script src="http://code.jquery.com/jquery-latest.min.js" type="text/javascript"></script>
+<style>
+	.hidden {
+		display: none;
+	}
+
+	.visible {
+		display: block;
+	}
+</style>
+<form>
+	<input type="button" value="create" onclick="showOp('create')" />
+	<input type="button" value="retrieve" onclick="showOp('retrieve')" />
+	<input type="button" value = "update" onclick="showOp('update')" />
+	<input type="button" value="delete" onclick="showOp('delete')" />
+</form>
+
+<div class="hidden" id="create">
+	<form>
+		<p>Name:<input type="text" id="create_name" /></p>
+		<p>Host Name:<input type="text" id="create_hostname" /></p>
+		<p>Port: <input type="text" id="create_port" /></p>
+		<p>User Name: <input type="text" id="create_username" /></p>
+		<input type="button" value="Submit" onclick="doCreate()" />
+		<input type="reset" value="Reset" />
+	</form>
+	<script>
+		function doCreate() {
+			var name = document.getElementById("create_name");
+			var hostname = document.getElementById("create_hostname");
+			var port = document.getElementById("create_port");
+			var username = document.getElementById("create_username");
+			
+			$.ajax(
+				{
+					url: 'http://localhost:8081/configuration', 
+					method: 'PUT',
+					data: "name=" + name.value + "&hostname=" + hostname.value + "&port=" + port.value + "&username=" + username.value,
+					success: function(data) { alert("Created Configuration Successfully."); }
+				}
+			);
+
+		}
+	</script>
+</div>
+<div class="hidden" id="retrieve">
+	<form>
+		Sort By:
+		<br />
+		<input type="radio" name="get_sort" value="name" /> Name
+		<input type="radio" name="get_sort" value="hostname" /> Host Name
+		<input type="radio" name="get_sort" value= "port" />Port
+		<input type="radio" name="get_sort" value="username" />User Name
+		<br />
+		<input type="hidden" id="get_index" name="get_index" value="0" />
+		<input type="button" value="Retrieve All" onclick="doRetrieve()" /> 
+		<input type="button" value="Paginated" onclick="doPaginated()" />
+	</form>
+	<div id="configurationDisplay">
+	</div>
+	<div id="scroll" class="hidden">
+		<a href="javascript:previous()">Previous</a>
+		<a href="javascript:next()">Next</a>
+	</div>
+	<script>
+		var scrollCount = 10;
+		var lastAction = null;
+		
+		function getSelected(name) {
+			var radios = document.getElementsByName(name);
+			for(var i = 0; i < radios.length; i++) {
+				if(radios[i].checked) {
+					return radios[i];
+				}
+			}
+			return null;
+		}
+		
+		function populate(data) {
+			var out = "<table border=\"1\"><tr><th>Name</th><th>Host Name</th><th>Port</th><th>User Name</th></tr>";
+			for(var i = 0; i < data.length; i++) {
+				var obj = data[i];
+				out += "<tr><td>" + obj.name + "</td><td>" + obj.hostname + "</td><td>" + obj.port + "</td><td>" + obj.username+ "</td></tr>";
+			}
+			
+			out += "</table>";
+			document.getElementById("configurationDisplay").innerHTML = out;
+		}
+		
+		function doRetrieve() {
+			var scroll = document.getElementById("scroll");
+			scroll.className = "hidden";
+			var sortRadio = getSelected("get_sort");
+			var data = "";
+
+			if(sortRadio != null) {
+				data += "sort=" + sortRadio.value;
+			}
+			
+			$.ajax(
+				{
+					url: 'http://localhost:8081/configuration', 
+					method: 'GET',
+					data: data,
+					success: function(data) { populate(data); }
+				}
+			);
+		}
+		
+		function doPaginated() {
+			var scroll = document.getElementById("scroll");
+			scroll.className = "visible";
+			
+			var index = document.getElementById("get_index");
+			index.value = "0";
+			
+			next();
+		}
+		
+		function next() {
+			
+			var sortRadio = getSelected("get_sort");
+			var data = "";
+
+			if(sortRadio != null) {
+				data += "sort=" + sortRadio.value;
+			}
+			
+			var indexElm = document.getElementById("get_index");
+			var index = parseInt(indexElm.value);
+			index = index >= 0 ? index : 0;
+			
+			if(index >= 0) {
+				if(lastAction == "prev" && index > 0) {
+					index += 2*scrollCount;
+				}
+				else if(lastAction == "prev" && index == 0) {
+					index += scrollCount;
+				}
+				
+				data += "&index=" + index + "&count=" + scrollCount;
+				
+				$.ajax({
+					url: 'http://localhost:8081/configuration', 
+					method: 'GET',
+					data: data,
+					success: function(data) { populate(data); }
+					}
+				);
+				index += scrollCount;
+				indexElm.value = "" + index;
+			}
+			
+			lastAction = "next";
+		}
+		
+		function previous() {
+			var sortRadio = getSelected("get_sort");
+			var data = "";
+
+			if(sortRadio != null) {
+				data += "sort=" + sortRadio.value;
+			}
+			
+			var indexElm = document.getElementById("get_index");
+			var index = parseInt(indexElm.value);
+			
+			if(index >= 0) {
+				if(lastAction == "next" && index > 0) {
+					index -= 2*scrollCount;
+				}
+				
+				data += "&index=" + index + "&count=" + scrollCount;
+				
+				$.ajax({
+					url: 'http://localhost:8081/configuration', 
+					method: 'GET',
+					data: data,
+					success: function(data) { populate(data); }
+					}
+				);
+				index -= scrollCount;
+				indexElm.value = "" + index;
+			}
+			
+			lastAction = "prev";
+		}
+	</script>
+</div>
+<div class="hidden" id="update">
+	<form>
+		<p>Name Key (Name of configuration you want to update): <input type="text" value="" id="update_namekey" /></p>
+		<p>Name:<input type="text" id="update_name" /></p>
+		<p>Host Name:<input type="text" id="update_hostname" /></p>
+		<p>Port: <input type="text" id="update_port" /></p>
+		<p>User Name: <input type="text" id="update_username" /></p>
+		<input type="button" value="Submit" onclick="doUpdate()"> 
+		<input type="reset" value="Reset" />
+	</form>
+	<script>
+		function doUpdate() {
+			var nameKey = document.getElementById("update_namekey");
+			var name = document.getElementById("update_name");
+			var hostname = document.getElementById("update_hostname");
+			var port = document.getElementById("update_port");
+			var username = document.getElementById("update_username");
+			alert("Name Key: " + nameKey);
+			
+			$.ajax(
+				{
+					url: 'http://localhost:8081/configuration', 
+					method: 'POST',
+					data: "nameKey=" + nameKey.value + "&name=" + name.value + "&hostname=" + hostname.value + "&port=" + port.value + "&username=" + username.value,
+					success: function(data) { alert("Updated Configuration Successfully."); }
+				}
+			);
+		}
+	</script>
+</div>
+<div class="hidden" id="delete">
+	<form>
+		<p>Name Key (Name of configuration you want to update): <input type="text" value="" id="delete_namekey" /></p>
+		<input type="button" value="Submit" onclick="doDelete()" />
+		<input type="reset" value="Reset" />
+	</form>
+	<script>
+		function doDelete() {
+			var nameKey = document.getElementById("delete_namekey");
+			
+			$.ajax(
+				{
+					url: 'http://localhost:8081/configuration', 
+					method: 'DELETE',
+					data: "nameKey=" + nameKey.value,
+					success: function(data) { alert("Deleted Configuration Successfully."); }
+				}
+			);
+		}
+	</script>
+</div>
+
+
+<script>
+	var ops = ["create", "retrieve", "delete", "update"];
+	function showOp(op) {
+		for(var i = 0; i < ops.length; i++) {
+			var node = document.getElementById(ops[i]);
+			if(op == ops[i]) {
+				node.className = "visible";
+			}
+			else {
+				node.className = "hidden";
+			}
+		}
+	}
+</script>
+<hr />
+<form method="POST" action="/logout">
+	<input type="submit" value="logout" />
+</form>
+</body>
+</html>
